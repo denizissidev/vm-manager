@@ -66,7 +66,7 @@ idx_setup() {
 }
 EOF
         echo -e "${G}✅ IDX TOOL SETUP COMPLETE!${N}"
-        echo -e "${R}👉 Now click 'REBUILD ENVIRONMENT' in the bottom popup!${N}"
+        echo -e "${R}👉 IMPORTANT: Click 'REBUILD ENVIRONMENT' in the popup!${N}"
     else
         echo -e "${Y}ℹ️  IDX configuration already exists.${N}"
     fi
@@ -76,13 +76,12 @@ EOF
 
 download_manager() {
     INSTALL_DIR="$HOME/.deniztech-vm"
-    VM_DIR="$HOME/vms"
     mkdir -p "$INSTALL_DIR"
-    mkdir -p "$VM_DIR"
+    mkdir -p "$HOME/vms"
 
-    # Skip sudo if in cloud environment to avoid "command not found"
     if [ -d "/etc/nix" ] || [ -n "${IDX_WORKSPACE_ID:-}" ]; then
         echo -e "${Y}ℹ️  Cloud environment detected. Skipping system sudo apt.${N}"
+        echo -e "${Y}ℹ️  (Make sure you ran Option 2 first!)${N}"
     else
         echo -e "${C}📥 Installing dependencies...${N}"
         sudo apt update && sudo apt install -y qemu-system qemu-utils cloud-image-utils wget lsof curl || true
@@ -93,6 +92,8 @@ download_manager() {
 
     echo -e "${C}🌐 Downloading VM Manager $LATEST_RELEASE...${N}"
     curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh"
+    # Fix potential line endings in the downloaded manager too
+    sed -i 's/\r$//' "$INSTALL_DIR/vm-manager.sh"
     chmod +x "$INSTALL_DIR/vm-manager.sh"
     
     echo "$LATEST_RELEASE" > "$INSTALL_DIR/version.txt"
@@ -105,7 +106,6 @@ download_manager() {
     read -p "Press Enter to return to menu..."
 }
 
-# Main Menu
 while true; do
     clear
     print_jishnu_logo
