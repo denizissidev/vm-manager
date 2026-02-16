@@ -1,152 +1,159 @@
 #!/usr/bin/env bash
 set -e
 
-echo "╔════════════════════════════════════════════════════════════╗"
-echo "║          DenizTech VM Manager - Auto Installer             ║"
-echo "║                  with Auto-Update Support                  ║"
-echo "╚════════════════════════════════════════════════════════════╝"
-echo ""
+# Colors
+R='\033[1;31m'
+G='\033[1;32m'
+Y='\033[1;33m'
+W='\033[1;37m'
+C='\033[1;36m'
+N='\033[0m'
 
-if [ "$EUID" -eq 0 ]; then 
-    echo "⚠️  Please do not run this script as root!"
-    echo "💡 Run it as a normal user: bash install-and-run.sh"
-    exit 1
-fi
+print_jishnu_logo() {
+    echo -e "${C}"
+    echo "========================================================================"
+    echo "                       _ _     _                 "
+    echo "                      | (_)   | |                "
+    echo "                      | |_ ___| |__  _ __  _   _ "
+    echo "                  _   | | / __| '_ \| '_ \| | | |"
+    echo "                 | |__| | \__ \ | | | | | | |_| |"
+    echo "                  \____/|_|___/_| |_|_| |_|\__,_|"
+    echo "                                                  "
+    echo "                    POWERED BY DENIZTECH          "
+    echo "========================================================================"
+    echo -e "${N}"
+}
 
-echo "📦 Step 1/5: Installing dependencies..."
-echo "This will require sudo password..."
-echo ""
+print_status() {
+    echo -e "${G}[INFO]${N} $1"
+}
 
-sudo apt update
-sudo apt install -y qemu-system qemu-utils cloud-image-utils wget lsof curl
+print_divider() {
+    echo -e "${Y}═══════════════════════════════════════════════════════════${N}"
+}
 
-echo ""
-echo "✅ Dependencies installed!"
-echo ""
-
-echo "🔍 Step 2/5: Verifying installations..."
-all_good=true
-for cmd in qemu-system-x86_64 wget cloud-localds qemu-img lsof curl; do
-    if command -v "$cmd" &> /dev/null; then
-        echo "  ✓ $cmd"
-    else
-        echo "  ✗ $cmd NOT FOUND"
-        all_good=false
-    fi
-done
-
-if [ "$all_good" = false ]; then
-    echo ""
-    echo "❌ Some dependencies failed to install."
-    exit 1
-fi
-
-echo ""
-echo "✅ All dependencies verified!"
-echo ""
-
-echo "⚙️  Step 3/5: Setting up directories..."
-INSTALL_DIR="$HOME/.deniztech-vm"
-VM_DIR="$HOME/vms"
-
-mkdir -p "$INSTALL_DIR"
-mkdir -p "$VM_DIR"
-
-echo "  ✓ Installation directory: $INSTALL_DIR"
-echo "  ✓ VM storage directory: $VM_DIR"
-echo ""
-
-echo "🌐 Step 4/5: Downloading latest VM Manager from GitHub..."
-
-GITHUB_REPO="denizissidev/vm-manager"
-LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-if [ -z "$LATEST_RELEASE" ] || [ "$LATEST_RELEASE" == "null" ]; then
-    echo "  ℹ️  Using direct download from main branch..."
-    curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh.tmp"
-    VERSION="main"
-else
-    echo "  ℹ️  Latest version: $LATEST_RELEASE"
-    curl -sL "https://github.com/$GITHUB_REPO/releases/download/$LATEST_RELEASE/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh.tmp" 2>/dev/null || \
-    curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh.tmp"
-    VERSION="$LATEST_RELEASE"
-fi
-
-# Fix line endings automatically (CRLF → LF)
-echo "  🔧 Fixing line endings (Windows → Unix)..."
-sed 's/\r$//' "$INSTALL_DIR/vm-manager.sh.tmp" > "$INSTALL_DIR/vm-manager.sh"
-rm -f "$INSTALL_DIR/vm-manager.sh.tmp"
-
-# Ensure it's executable
-chmod +x "$INSTALL_DIR/vm-manager.sh"
-
-# Save version
-echo "$VERSION" > "$INSTALL_DIR/version.txt"
-
-# Verify the file is now correct
-if head -1 "$INSTALL_DIR/vm-manager.sh" | grep -q $'bash\r'; then
-    echo "  ⚠️  Line ending fix failed, trying alternative method..."
-    tr -d '\r' < "$INSTALL_DIR/vm-manager.sh" > "$INSTALL_DIR/vm-manager.sh.fixed"
-    mv "$INSTALL_DIR/vm-manager.sh.fixed" "$INSTALL_DIR/vm-manager.sh"
-    chmod +x "$INSTALL_DIR/vm-manager.sh"
-fi
-
-echo "  ✓ VM Manager downloaded and fixed successfully"
-echo ""
-
-echo "🔧 Step 5/5: Setting up global 'vmmanager' command..."
-
-if ! grep -q "alias vmmanager=" "$HOME/.bashrc" 2>/dev/null; then
-    echo "" >> "$HOME/.bashrc"
-    echo "# DenizTech VM Manager" >> "$HOME/.bashrc"
-    echo "alias vmmanager='$INSTALL_DIR/vm-manager.sh'" >> "$HOME/.bashrc"
-    echo "  ✓ Added 'vmmanager' command to .bashrc"
-else
-    # Update existing alias to ensure it points to correct location
-    sed -i "s|alias vmmanager=.*|alias vmmanager='$INSTALL_DIR/vm-manager.sh'|g" "$HOME/.bashrc"
-    echo "  ✓ Updated 'vmmanager' command in .bashrc"
-fi
-
-# Try to create system-wide command (optional, no sudo prompt)
-if [ -w "/usr/local/bin" ]; then
-    ln -sf "$INSTALL_DIR/vm-manager.sh" /usr/local/bin/vmmanager 2>/dev/null || true
-fi
-
-echo ""
-echo "╔════════════════════════════════════════════════════════════╗"
-echo "║               🎉 Installation Complete!                    ║"
-echo "╚════════════════════════════════════════════════════════════╝"
-echo ""
-echo "✅ VM Manager installed to: $INSTALL_DIR"
-echo "✅ VM storage location: $VM_DIR"
-echo "✅ Line endings fixed automatically"
-echo ""
-
-# Automatically source .bashrc for current session
-echo "🔄 Loading vmmanager command for current session..."
-source "$HOME/.bashrc"
-
-echo "✅ 'vmmanager' command is now available!"
-echo ""
-echo "🚀 You can now run VM Manager from anywhere with:"
-echo "   • vmmanager"
-echo ""
-
-# Verify installation
-echo "📝 Verifying installation..."
-if command -v vmmanager &> /dev/null; then
-    echo "  ✅ 'vmmanager' command is working!"
-else
-    echo "  ⚠️  Creating alias for current session..."
-    alias vmmanager="$INSTALL_DIR/vm-manager.sh"
-fi
-
-echo ""
-read -p "🎯 Would you like to start VM Manager now? (y/N): " start_now
-if [[ "$start_now" =~ ^[Yy]$ ]]; then
+idx_setup() {
     clear
-    exec "$INSTALL_DIR/vm-manager.sh"
-fi
+    print_jishnu_logo
+    echo -e "${R}🔧 IDX TOOL SETUP${N}"
+    print_divider
+    echo
+    
+    echo -e "${R}╔══════════════════════════════════════════════════════════╗${N}"
+    echo -e "${R}║${W}              IDX DEVELOPMENT TOOL SETUP               ${R}║${N}"
+    echo -e "${R}╚══════════════════════════════════════════════════════════╝${N}\n"
+    
+    echo -e "${Y}🧹 Cleaning up old files...${N}"
+    cd "$HOME"
+    rm -rf myapp 2>/dev/null || true
+    rm -rf flutter 2>/dev/null || true
+    
+    # Navigate to workspace (standard IDX directory)
+    mkdir -p "$HOME/vps123"
+    cd "$HOME/vps123"
+    
+    if [ ! -d ".idx" ]; then
+        echo -e "${G}📁 Creating .idx directory...${N}"
+        mkdir .idx
+        cd .idx
+        
+        echo -e "${C}📝 Creating dev.nix configuration...${N}"
+        echo -e "${Y}─────────────────────────────────────────────────────────${N}"
+        
+        cat <<EOF > dev.nix
+{ pkgs, ... }: {
+  channel = "stable-24.05";
 
-echo ""
-echo "💡 Tip: Just type 'vmmanager' anytime to launch the VM Manager!"
+  packages = with pkgs; [
+    unzip
+    openssh
+    git
+    qemu_kvm
+    sudo
+    cdrkit
+    cloud-utils
+    qemu
+  ];
+
+  env = {
+    EDITOR = "nano";
+  };
+
+  idx = {
+    extensions = [
+      "Dart-Code.flutter"
+      "Dart-Code.dart-code"
+    ];
+
+    workspace = {
+      onCreate = { };
+      onStart = { };
+    };
+
+    previews = {
+      enable = false;
+    };
+  };
+}
+EOF
+        
+        echo -e "${Y}─────────────────────────────────────────────────────────${N}"
+        echo -e "\n${G}✅ IDX TOOL SETUP COMPLETE!${N}"
+        echo -e "${R}┌────────────────────────────────────────────────────────┐${N}"
+        echo -e "${R}│${W}  Rebuild your environment to install dependencies!    ${R}│${N}"
+        echo -e "${R}└────────────────────────────────────────────────────────┘${N}"
+    else
+        echo -e "${Y}ℹ️  IDX configuration already exists.${N}"
+    fi
+    echo
+    read -p "Press Enter to return to menu..."
+}
+
+download_manager() {
+    echo -e "${G}📦 Setting up VM Manager...${N}"
+    INSTALL_DIR="$HOME/.deniztech-vm"
+    VM_DIR="$HOME/vms"
+    mkdir -p "$INSTALL_DIR"
+    mkdir -p "$VM_DIR"
+
+    # Fix: Skip sudo apt if in IDX to avoid "command not found"
+    if [ -d "/etc/nix" ]; then
+        echo -e "${Y}ℹ️  Cloud environment detected. Skipping system package install.${N}"
+    else
+        echo -e "${C}📥 Installing system dependencies...${N}"
+        sudo apt update && sudo apt install -y qemu-system qemu-utils cloud-image-utils wget lsof curl || true
+    fi
+
+    GITHUB_REPO="denizissidev/vm-manager"
+    LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "v1.0.0")
+
+    echo -e "${C}🌐 Downloading VM Manager $LATEST_RELEASE...${N}"
+    curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh"
+    echo "$LATEST_RELEASE" > "$INSTALL_DIR/version.txt"
+    chmod +x "$INSTALL_DIR/vm-manager.sh"
+
+    # Setup Alias
+    if ! grep -q "alias vmmanager=" "$HOME/.bashrc"; then
+        echo "alias vmmanager='$INSTALL_DIR/vm-manager.sh'" >> "$HOME/.bashrc"
+    fi
+
+    echo -e "${G}✅ Success! Run 'source ~/.bashrc' then 'vmmanager'${N}"
+    read -p "Press Enter to return to menu..."
+}
+
+while true; do
+    clear
+    print_jishnu_logo
+    echo -e "${W}1) 📥 DOWNLOAD VM-MANAGER${N}"
+    echo -e "${W}2) 🔧 INSTALL TOOL FOR GOOGLE IDX${N}"
+    echo -e "${W}0) 🚪 EXIT${N}"
+    echo
+    read -p "Select an option: " choice
+
+    case $choice in
+        1) download_manager ;;
+        2) idx_setup ;;
+        0) exit 0 ;;
+        *) echo -e "${R}Invalid option${N}"; sleep 1 ;;
+    esac
+done
