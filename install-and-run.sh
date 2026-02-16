@@ -19,7 +19,7 @@ print_jishnu_logo() {
     echo "                 | |__| | \__ \ | | | | | | |_| |"
     echo "                  \____/|_|___/_| |_|_| |_|\__,_|"
     echo "                                                  "
-    echo "                    POWERED BY DENIZTECH          "
+    echo "                    POWERED BY DENİ"
     echo "========================================================================"
     echo -e "${N}"
 }
