@@ -24,31 +24,17 @@ print_jishnu_logo() {
     echo -e "${N}"
 }
 
-print_status() {
-    echo -e "${G}[INFO]${N} $1"
-}
-
-print_divider() {
-    echo -e "${Y}═══════════════════════════════════════════════════════════${N}"
-}
-
 idx_setup() {
     clear
     print_jishnu_logo
-    echo -e "${R}🔧 IDX TOOL SETUP${N}"
-    print_divider
-    echo
-    
     echo -e "${R}╔══════════════════════════════════════════════════════════╗${N}"
     echo -e "${R}║${W}              IDX DEVELOPMENT TOOL SETUP               ${R}║${N}"
     echo -e "${R}╚══════════════════════════════════════════════════════════╝${N}\n"
     
     echo -e "${Y}🧹 Cleaning up old files...${N}"
     cd "$HOME"
-    rm -rf myapp 2>/dev/null || true
-    rm -rf flutter 2>/dev/null || true
+    rm -rf myapp flutter 2>/dev/null || true
     
-    # Navigate to workspace (standard IDX directory)
     mkdir -p "$HOME/vps123"
     cd "$HOME/vps123"
     
@@ -58,12 +44,9 @@ idx_setup() {
         cd .idx
         
         echo -e "${C}📝 Creating dev.nix configuration...${N}"
-        echo -e "${Y}─────────────────────────────────────────────────────────${N}"
-        
         cat <<EOF > dev.nix
 { pkgs, ... }: {
   channel = "stable-24.05";
-
   packages = with pkgs; [
     unzip
     openssh
@@ -74,34 +57,16 @@ idx_setup() {
     cloud-utils
     qemu
   ];
-
-  env = {
-    EDITOR = "nano";
-  };
-
   idx = {
-    extensions = [
-      "Dart-Code.flutter"
-      "Dart-Code.dart-code"
-    ];
-
     workspace = {
       onCreate = { };
       onStart = { };
     };
-
-    previews = {
-      enable = false;
-    };
   };
 }
 EOF
-        
-        echo -e "${Y}─────────────────────────────────────────────────────────${N}"
-        echo -e "\n${G}✅ IDX TOOL SETUP COMPLETE!${N}"
-        echo -e "${R}┌────────────────────────────────────────────────────────┐${N}"
-        echo -e "${R}│${W}  Rebuild your environment to install dependencies!    ${R}│${N}"
-        echo -e "${R}└────────────────────────────────────────────────────────┘${N}"
+        echo -e "${G}✅ IDX TOOL SETUP COMPLETE!${N}"
+        echo -e "${R}👉 Now click 'REBUILD ENVIRONMENT' in the bottom popup!${N}"
     else
         echo -e "${Y}ℹ️  IDX configuration already exists.${N}"
     fi
@@ -110,17 +75,16 @@ EOF
 }
 
 download_manager() {
-    echo -e "${G}📦 Setting up VM Manager...${N}"
     INSTALL_DIR="$HOME/.deniztech-vm"
     VM_DIR="$HOME/vms"
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$VM_DIR"
 
-    # Fix: Skip sudo apt if in IDX to avoid "command not found"
-    if [ -d "/etc/nix" ]; then
-        echo -e "${Y}ℹ️  Cloud environment detected. Skipping system package install.${N}"
+    # FIX: Skip sudo if in IDX/Nix environment to avoid "command not found"
+    if [ -d "/etc/nix" ] || [ -n "${IDX_WORKSPACE_ID:-}" ]; then
+        echo -e "${Y}ℹ️  Cloud environment detected. Skipping 'sudo apt'.${N}"
     else
-        echo -e "${C}📥 Installing system dependencies...${N}"
+        echo -e "${C}📥 Installing dependencies...${N}"
         sudo apt update && sudo apt install -y qemu-system qemu-utils cloud-image-utils wget lsof curl || true
     fi
 
@@ -129,10 +93,11 @@ download_manager() {
 
     echo -e "${C}🌐 Downloading VM Manager $LATEST_RELEASE...${N}"
     curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh"
-    echo "$LATEST_RELEASE" > "$INSTALL_DIR/version.txt"
     chmod +x "$INSTALL_DIR/vm-manager.sh"
+    
+    # Save version for the updater
+    echo "$LATEST_RELEASE" > "$INSTALL_DIR/version.txt"
 
-    # Setup Alias
     if ! grep -q "alias vmmanager=" "$HOME/.bashrc"; then
         echo "alias vmmanager='$INSTALL_DIR/vm-manager.sh'" >> "$HOME/.bashrc"
     fi
@@ -141,12 +106,13 @@ download_manager() {
     read -p "Press Enter to return to menu..."
 }
 
+# Main Menu
 while true; do
     clear
     print_jishnu_logo
-    echo -e "${W}1) 📥 DOWNLOAD VM-MANAGER${N}"
-    echo -e "${W}2) 🔧 INSTALL TOOL FOR GOOGLE IDX${N}"
-    echo -e "${W}0) 🚪 EXIT${N}"
+    echo -e "1) 📥 DOWNLOAD VM-MANAGER"
+    echo -e "2) 🔧 INSTALL TOOL FOR GOOGLE IDX"
+    echo -e "0) 🚪 EXIT"
     echo
     read -p "Select an option: " choice
 
@@ -154,6 +120,6 @@ while true; do
         1) download_manager ;;
         2) idx_setup ;;
         0) exit 0 ;;
-        *) echo -e "${R}Invalid option${N}"; sleep 1 ;;
+        *) echo -e "${R}Invalid choice${N}"; sleep 1 ;;
     esac
 done
