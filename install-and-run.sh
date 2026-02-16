@@ -61,18 +61,37 @@ echo "🌐 Step 4/5: Downloading latest VM Manager from GitHub..."
 GITHUB_REPO="denizissidev/vm-manager"
 LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
-if [ -z "$LATEST_RELEASE" ]; then
-    echo "⚠️  Could not fetch latest release, using direct download..."
-    curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh"
+if [ -z "$LATEST_RELEASE" ] || [ "$LATEST_RELEASE" == "null" ]; then
+    echo "  ℹ️  Using direct download from main branch..."
+    curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh.tmp"
+    VERSION="main"
 else
     echo "  ℹ️  Latest version: $LATEST_RELEASE"
-    curl -sL "https://github.com/$GITHUB_REPO/releases/download/$LATEST_RELEASE/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh" || \
-    curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh"
-    echo "$LATEST_RELEASE" > "$INSTALL_DIR/version.txt"
+    curl -sL "https://github.com/$GITHUB_REPO/releases/download/$LATEST_RELEASE/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh.tmp" 2>/dev/null || \
+    curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh.tmp"
+    VERSION="$LATEST_RELEASE"
 fi
 
+# Fix line endings automatically (CRLF → LF)
+echo "  🔧 Fixing line endings (Windows → Unix)..."
+sed 's/\r$//' "$INSTALL_DIR/vm-manager.sh.tmp" > "$INSTALL_DIR/vm-manager.sh"
+rm -f "$INSTALL_DIR/vm-manager.sh.tmp"
+
+# Ensure it's executable
 chmod +x "$INSTALL_DIR/vm-manager.sh"
-echo "  ✓ VM Manager downloaded successfully"
+
+# Save version
+echo "$VERSION" > "$INSTALL_DIR/version.txt"
+
+# Verify the file is now correct
+if head -1 "$INSTALL_DIR/vm-manager.sh" | grep -q $'bash\r'; then
+    echo "  ⚠️  Line ending fix failed, trying alternative method..."
+    tr -d '\r' < "$INSTALL_DIR/vm-manager.sh" > "$INSTALL_DIR/vm-manager.sh.fixed"
+    mv "$INSTALL_DIR/vm-manager.sh.fixed" "$INSTALL_DIR/vm-manager.sh"
+    chmod +x "$INSTALL_DIR/vm-manager.sh"
+fi
+
+echo "  ✓ VM Manager downloaded and fixed successfully"
 echo ""
 
 echo "🔧 Step 5/5: Setting up global 'vmmanager' command..."
@@ -83,11 +102,14 @@ if ! grep -q "alias vmmanager=" "$HOME/.bashrc" 2>/dev/null; then
     echo "alias vmmanager='$INSTALL_DIR/vm-manager.sh'" >> "$HOME/.bashrc"
     echo "  ✓ Added 'vmmanager' command to .bashrc"
 else
-    echo "  ℹ️  'vmmanager' command already exists in .bashrc"
+    # Update existing alias to ensure it points to correct location
+    sed -i "s|alias vmmanager=.*|alias vmmanager='$INSTALL_DIR/vm-manager.sh'|g" "$HOME/.bashrc"
+    echo "  ✓ Updated 'vmmanager' command in .bashrc"
 fi
 
-if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-    sudo ln -sf "$INSTALL_DIR/vm-manager.sh" /usr/local/bin/vmmanager 2>/dev/null || true
+# Try to create system-wide command (optional, no sudo prompt)
+if [ -w "/usr/local/bin" ]; then
+    ln -sf "$INSTALL_DIR/vm-manager.sh" /usr/local/bin/vmmanager 2>/dev/null || true
 fi
 
 echo ""
@@ -97,15 +119,34 @@ echo "╚═══════════════════════�
 echo ""
 echo "✅ VM Manager installed to: $INSTALL_DIR"
 echo "✅ VM storage location: $VM_DIR"
-echo ""
-echo "🚀 You can now run VM Manager with any of these commands:"
-echo "   • vmmanager           (after reopening terminal)"
-echo "   • $INSTALL_DIR/vm-manager.sh"
-echo ""
-echo "📝 Note: Type 'vmmanager' from any directory after reopening your terminal"
+echo "✅ Line endings fixed automatically"
 echo ""
 
+# Automatically source .bashrc for current session
+echo "🔄 Loading vmmanager command for current session..."
+source "$HOME/.bashrc"
+
+echo "✅ 'vmmanager' command is now available!"
+echo ""
+echo "🚀 You can now run VM Manager from anywhere with:"
+echo "   • vmmanager"
+echo ""
+
+# Verify installation
+echo "📝 Verifying installation..."
+if command -v vmmanager &> /dev/null; then
+    echo "  ✅ 'vmmanager' command is working!"
+else
+    echo "  ⚠️  Creating alias for current session..."
+    alias vmmanager="$INSTALL_DIR/vm-manager.sh"
+fi
+
+echo ""
 read -p "🎯 Would you like to start VM Manager now? (y/N): " start_now
 if [[ "$start_now" =~ ^[Yy]$ ]]; then
+    clear
     exec "$INSTALL_DIR/vm-manager.sh"
 fi
+
+echo ""
+echo "💡 Tip: Just type 'vmmanager' anytime to launch the VM Manager!"
