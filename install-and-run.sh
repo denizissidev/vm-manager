@@ -80,9 +80,9 @@ download_manager() {
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$VM_DIR"
 
-    # FIX: Skip sudo if in IDX/Nix environment to avoid "command not found"
+    # Skip sudo if in cloud environment to avoid "command not found"
     if [ -d "/etc/nix" ] || [ -n "${IDX_WORKSPACE_ID:-}" ]; then
-        echo -e "${Y}ℹ️  Cloud environment detected. Skipping 'sudo apt'.${N}"
+        echo -e "${Y}ℹ️  Cloud environment detected. Skipping system sudo apt.${N}"
     else
         echo -e "${C}📥 Installing dependencies...${N}"
         sudo apt update && sudo apt install -y qemu-system qemu-utils cloud-image-utils wget lsof curl || true
@@ -95,7 +95,6 @@ download_manager() {
     curl -sL "https://raw.githubusercontent.com/$GITHUB_REPO/main/vm-manager.sh" -o "$INSTALL_DIR/vm-manager.sh"
     chmod +x "$INSTALL_DIR/vm-manager.sh"
     
-    # Save version for the updater
     echo "$LATEST_RELEASE" > "$INSTALL_DIR/version.txt"
 
     if ! grep -q "alias vmmanager=" "$HOME/.bashrc"; then
